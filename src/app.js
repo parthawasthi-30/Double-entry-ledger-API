@@ -1,17 +1,22 @@
-const express = require("express")
-const cookieParser = require("cookie-parser")
-const authRouter = require("./routes/auth.routes")
-const accountRouter = require("./routes/accounts.routes")
-const transactionRoutes = require("./routes/transaction.routes")
-const app = express()
+const express = require("express");
+const cookieParser = require("cookie-parser");
+const cors = require("cors");
+const authRouter = require("./routes/auth.routes");
+const accountRouter = require("./routes/accounts.routes");
+const transactionRoutes = require("./routes/transaction.routes");
 
-app.use(express.json())
-app.use(cookieParser())
+const app = express();
+
+app.use(cors()); 
+app.use(express.json());
+app.use(cookieParser());
+
+app.get("/", (req, res) => {
+  res.send("Ledger Service is up and Running");
+});
+
+app.use("/api/auth", authRouter);
+app.use("/api/accounts", accountRouter);
 app.use("/api/transactions", transactionRoutes);
-app.get("/",(req, res) =>{
-    res.send("Ledger Service is up and Running ")
-})
 
-app.use("/api/auth", authRouter)
-app.use("/api/accounts", accountRouter)
-module.exports = app  
+module.exports = app;

@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ledger · Double-Entry Banking</title>
+<style>
+  :root {
+    --bg: #070b14;
+    --panel: #0f172a;
+    --panel-2: #162036;
+    --border: #1e2b45;
+    --text: #e8eef9;
+    --muted: #8796b3;
+    --accent: #34d399;
+    --accent-2: #60a5fa;
+    --danger: #f87171;
+    --warn: #fbbf24;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--text);
+    background:
+      radial-gradient(900px 500px at 0% 0%, rgba(96,165,250,.15), transparent 60%),
+      radial-gradient(800px 500px at 100% 0%, rgba(52,211,153,.12), transparent 60%),
+      var(--bg);
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 24px 16px 80px; }
+
+  /* Header */
+  header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 28px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 18px; letter-spacing: .2px; }
+  .logo {
+    width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #04110c; font-weight: 900;
+  }
+  .status { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 0 4px rgba(251,191,36,.12); }
+  .dot.on { background: var(--accent); box-shadow: 0 0 0 4px rgba(52,211,153,.12); }
+  .dot.off { background: var(--danger); box-shadow: 0 0 0 4px rgba(248,113,113,.12); }
+
+  /* Cards */
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+  .card + .card { margin-top: 18px; }
+  h2 { margin: 0 0 4px; font-size: 19px; }
+  .sub { margin: 0 0 18px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+  .hidden { display: none !important; }
+
+  /* Auth */
+  .auth { max-width: 420px; margin: 40px auto 0; }
+  .tabs { display: flex; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 4px; margin-bottom: 22px; }
+  .tabs button { flex: 1; background: transparent; color: var(--muted); border: 0; padding: 10px; border-radius: 9px; font-weight: 600; cursor: pointer; }
+  .tabs button.active { background: var(--panel-2); color: var(--text); }
+
+  label { display: block; font-size: 13px; color: var(--muted); margin: 14px 0 6px; }
+  .field { position: relative; }
+  input {
+    width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text); font: inherit; font-size: 15px; outline: none; transition: border-color .15s, box-shadow .15s;
+  }
+  input:focus { border-color: var(--accent-2); box-shadow: 0 0 0 4px rgba(96,165,250,.15); }
+  .eye { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: transparent; color: var(--muted); padding: 6px; font-size: 12px; }
+
+  button.primary {
+    width: 100%; margin-top: 20px; padding: 13px; border: 0; border-radius: 10px; cursor: pointer;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #04110c; font-weight: 700; font-size: 15px;
+    transition: transform .05s, opacity .2s;
+  }
+  button.primary:hover { opacity: .92; }
+  button.primary:active { transform: scale(.985); }
+  button.primary:disabled { opacity: .55; cursor: not-allowed; }
+
+  button.ghost {
+    background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+    padding: 9px 14px; border-radius: 9px; font-weight: 600; font-size: 13px; cursor: pointer;
+  }
+  button.ghost:hover { border-color: var(--accent-2); }
+  button.ghost:disabled { opacity: .5; cursor: not-allowed; }
+  button.danger { background: transparent; color: var(--danger); border: 1px solid rgba(248,113,113,.35); }
+  button.danger:hover { background: rgba(248,113,113,.08); }
+
+  .inline-msg { margin-top: 14px; padding: 10px 12px; border-radius: 10px; font-size: 13px; line-height: 1.5; display: none; }
+  .inline-msg.show { display: block; }
+  .inline-msg.err { background: rgba(248,113,113,.1); color: #fecaca; border: 1px solid rgba(248,113,113,.25); }
+  .inline-msg.info { background: rgba(251,191,36,.08); color: #fde68a; border: 1px solid rgba(251,191,36,.25); }
+
+  /* Dashboard */
+  .topbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; margin-bottom: 18px; }
+  .hello { color: var(--muted); font-size: 14px; }
+  .hello strong { color: var(--text); display: block; font-size: 16px; }
+  .toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .primary-sm { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #04110c; border: 0; padding: 9px 14px; border-radius: 9px; font-weight: 700; font-size: 13px; cursor: pointer; }
+  .primary-sm:disabled { opacity: .5; cursor: not-allowed; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 14px; }
+  .acc { background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .acc-top { display: flex; justify-content: space-between; align-items: center; }
+  .badge { font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 999px; background: rgba(52,211,153,.12); color: var(--accent); }
+  .badge.bad { background: rgba(248,113,113,.12); color: var(--danger); }
+  .cur { font-size: 12px; color: var(--muted); }
+  .acc-id { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: var(--muted); word-break: break-all; }
+  .bal { font-size: 26px; font-weight: 800; letter-spacing: .3px; }
+  .bal.hidden-bal { font-size: 14px; font-weight: 500; color: var(--muted); }
+  .acc .actions { gap: 6px; }
+  .empty { text-align: center; padding: 34px 12px; color: var(--muted); border: 1px dashed var(--border); border-radius: 12px; font-size: 14px; }
+  .skeleton { height: 150px; border-radius: 12px; background: linear-gradient(90deg, var(--panel-2) 25%, #1d2a46 50%, var(--panel-2) 75%); background-size: 200% 100%; animation: shimmer 1.2s infinite; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 640px) { .split { grid-template-columns: 1fr; } }
+
+  details { margin-top: 18px; color: var(--muted); font-size: 13px; }
+  summary { cursor: pointer; }
+  .setting { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .setting input { flex: 1; min-width: 240px; padding: 9px 12px; font-size: 13px; }
+
+  /* Toasts */
+  #toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 10px; z-index: 50; }
+  .toast {
+    min-width: 260px; max-width: 360px; padding: 12px 14px; border-radius: 12px;
+    background: var(--panel-2); border: 1px solid var(--border); box-shadow: 0 14px 40px rgba(0,0,0,.4);
+    font-size: 14px; animation: up .2s ease; border-left: 4px solid var(--accent);
+  }
+  .toast.err { border-left-color: var(--danger); }
+  @keyframes up { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  .spin { display: inline-block; width: 13px; height: 13px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: rot .7s linear infinite; vertical-align: -2px; margin-right: 6px; }
+  @keyframes rot { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand"><div class="logo">L</div> Ledger</div>
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <span class="status"><span id="dot" class="dot"></span><span id="statusText">Server check ho raha hai...</span></span>
+      <button id="logoutBtn" class="ghost hidden">Logout</button>
+    </div>
+  </header>
+
+  <!-- AUTH -->
+  <section id="authSection" class="card auth">
+    <div class="tabs">
+      <button id="tabLogin" class="active" type="button">Login</button>
+      <button id="tabRegister" type="button">Register</button>
+    </div>
+
+    <form id="loginForm" novalidate>
+      <h2>Wapas swagat hai</h2>
+      <p class="sub">Apne account se login karo.</p>
+      <label for="loginEmail">Email</label>
+      <input id="loginEmail" type="email" autocomplete="email" required />
+      <label for="loginPassword">Password</label>
+      <div class="field">
+        <input id="loginPassword" type="password" autocomplete="current-password" required />
+        <button type="button" class="eye" data-eye="loginPassword">Show</button>
+      </div>
+      <button type="submit" class="primary" id="loginBtn">Login</button>
+      <div id="loginMsg" class="inline-msg"></div>
+    </form>
+
+    <form id="registerForm" class="hidden" novalidate>
+      <h2>Naya account banao</h2>
+      <p class="sub">Password kam se kam 6 characters ka rakho.</p>
+      <label for="regName">Naam</label>
+      <input id="regName" required />
+      <label for="regEmail">Email</label>
+      <input id="regEmail" type="email" autocomplete="email" required />
+      <label for="regPassword">Password</label>
+      <div class="field">
+        <input id="regPassword" type="password" minlength="6" autocomplete="new-password" required />
+        <button type="button" class="eye" data-eye="regPassword">Show</button>
+      </div>
+      <button type="submit" class="primary" id="registerBtn">Register</button>
+      <div id="registerMsg" class="inline-msg"></div>
+    </form>
+  </section>
+
+  <!-- DASHBOARD -->
+  <main id="dashboard" class="hidden">
+    <div class="topbar">
+      <div class="hello"><span>Hello,</span><strong id="userName"></strong><span id="userEmail"></span></div>
+    </div>
+
+    <section class="card">
+      <div class="toolbar">
+        <div>
+          <h2>Tere accounts</h2>
+          <p class="sub" style="margin:0">Balance sirf ledger entries se calculate hota hai.</p>
+        </div>
+        <div class="actions">
+          <button id="refreshBtn" class="ghost">Refresh</button>
+          <button id="createAccountBtn" class="primary-sm">+ New account</button>
+        </div>
+      </div>
+      <div id="accountsGrid" class="grid"></div>
+    </section>
+
+    <section class="card">
+      <h2>Transfer</h2>
+      <p class="sub">Account card pe "Use as sender" dabao, phir receiver ka ID paste karo.</p>
+      <form id="transferForm" novalidate>
+        <div class="split">
+          <div>
+            <label for="fromAccount">From (sender)</label>
+            <input id="fromAccount" required />
+          </div>
+          <div>
+            <label for="toAccount">To (receiver)</label>
+            <input id="toAccount" required />
+          </div>
+        </div>
+        <label for="amount">Amount (INR)</label>
+        <input id="amount" type="number" min="0.01" step="0.01" required />
+        <button type="submit" class="primary" id="transferBtn">Transfer</button>
+        <div id="transferMsg" class="inline-msg"></div>
+      </form>
+    </section>
+
+    <details>
+      <summary>Settings (API URL)</summary>
+      <div class="setting">
+        <input id="apiInput" />
+        <button id="saveApiBtn" class="ghost">Save</button>
+        <button id="resetApiBtn" class="ghost">Default</button>
+      </div>
+    </details>
+  </main>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+  const DEFAULT_API = "https://double-entry-ledger-api-zfqe.onrender.com/api";
+  let API = localStorage.getItem("apiBase") || DEFAULT_API;
+  let token = localStorage.getItem("token");
+  let user = JSON.parse(localStorage.getItem("user") || "null");
+
+  const $ = (id) => document.getElementById(id);
+  const rootUrl = () => API.replace(/\/api\/?$/, "");
+
+  /* ---------- helpers ---------- */
+
+  function toast(message, type = "ok") {
+    const el = document.createElement("div");
+    el.className = "toast" + (type === "err" ? " err" : "");
+    el.textContent = message;
+    $("toasts").appendChild(el);
+    setTimeout(() => el.remove(), 4000);
+  }
+
+  function inlineMsg(id, text, type = "err") {
+    const el = $(id);
+    el.textContent = text;
+    el.className = `inline-msg show ${type}`;
+  }
+  function clearInline(id) {
+    $(id).className = "inline-msg";
+    $(id).textContent = "";
+  }
+
+  function setBusy(btn, busy, label) {
+    btn.disabled = busy;
+    btn.innerHTML = busy ? `<span class="spin"></span>${label}` : label;
+  }
+
+  function esc(str) {
+    return String(str ?? "").replace(/[&<>"']/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  function money(n) {
+    return "₹" + Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  /* ---------- server status (Render cold start handle karta hai) ---------- */
+
+  async function checkServer(retries = 4) {
+    const dot = $("dot"), text = $("statusText");
+    dot.className = "dot";
+    text.textContent = "Server check ho raha hai...";
+    for (let i = 1; i <= retries; i++) {
+      try {
+        const res = await fetch(rootUrl() + "/", { cache: "no-store" });
+        if (res.ok) {
+          dot.className = "dot on";
+          text.textContent = "Server online";
+          return true;
+        }
+      } catch (_) {}
+      if (i < retries) {
+        text.textContent = `Server jaag raha hai... (try ${i}/${retries})`;
+        await new Promise((r) => setTimeout(r, 4000));
+      }
+    }
+    dot.className = "dot off";
+    text.textContent = "Server offline. Render free plan so gaya hoga, 1 min baad refresh karo.";
+    return false;
+  }
+
+  /* ---------- API ---------- */
+
+  async function api(path, options = {}) {
+    const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    let res;
+    try {
+      res = await fetch(API + path, { ...options, headers });
+    } catch (err) {
+      throw new Error("Network error. Server tak request nahi pahunchi (ya CORS block hua). Console (F12) check karo.");
+    }
+
+    const data = await res.json().catch(() => ({}));
+
+    if (res.status === 401 && token && !path.startsWith("/auth/")) {
+      clearSession();
+      showAuth();
+      throw new Error("Session khatam ho gaya, dobara login karo.");
+    }
+    if (!res.ok) throw new Error(data.message || `Request fail hui (status ${res.status})`);
+    return data;
+  }
+
+  /* ---------- session & view ---------- */
+
+  function saveSession(data) {
+    token = data.token;
+    user = data.user || null;
+    localStorage.setItem("token", token);
+    localStorage.setItem("user", JSON.stringify(user));
+  }
+
+  function clearSession() {
+    token = null; user = null;
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+  }
+
+  function showAuth() {
+    $("dashboard").classList.add("hidden");
+    $("authSection").classList.remove("hidden");
+    $("logoutBtn").classList.add("hidden");
+  }
+
+  function showDashboard() {
+    $("authSection").classList.add("hidden");
+    $("dashboard").classList.remove("hidden");
+    $("logoutBtn").classList.remove("hidden");
+    $("userName").textContent = user?.name || "User";
+    $("userEmail").textContent = user?.email || "";
+    loadAccounts();
+  }
+
+  function switchTab(tab) {
+    const login = tab === "login";
+    $("loginForm").classList.toggle("hidden", !login);
+    $("registerForm").classList.toggle("hidden", login);
+    $("tabLogin").classList.toggle("active", login);
+    $("tabRegister").classList.toggle("active", !login);
+    clearInline("loginMsg");
+    clearInline("registerMsg");
+  }
+  $("tabLogin").onclick = () => switchTab("login");
+  $("tabRegister").onclick = () => switchTab("register");
+
+  document.querySelectorAll("[data-eye]").forEach((b) => {
+    b.onclick = () => {
+      const input = $(b.dataset.eye);
+      const show = input.type === "password";
+      input.type = show ? "text" : "password";
+      b.textContent = show ? "Hide" : "Show";
+    };
+  });
+
+  /* ---------- auth ---------- */
+
+  $("loginForm").onsubmit = async (e) => {
+    e.preventDefault();
+    clearInline("loginMsg");
+    const email = $("loginEmail").value.trim();
+    const password = $("loginPassword").value;
+    if (!email || !password) return inlineMsg("loginMsg", "Email aur password dono bharo.");
+
+    const btn = $("loginBtn");
+    setBusy(btn, true, "Login ho raha hai...");
+    inlineMsg("loginMsg", "Server se baat ho rahi hai, pehli baar 30-60 sec lag sakte hain.", "info");
+    try {
+      const data = await api("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
+      saveSession(data);
+      $("loginPassword").value = "";
+      toast("Login ho gaya");
+      showDashboard();
+    } catch (err) {
+      inlineMsg("loginMsg", err.message);
+    } finally {
+      setBusy(btn, false, "Login");
+    }
+  };
+
+  $("registerForm").onsubmit = async (e) => {
+    e.preventDefault();
+    clearInline("registerMsg");
+    const name = $("regName").value.trim();
+    const email = $("regEmail").value.trim();
+    const password = $("regPassword").value;
+    if (!name || !email || !password) return inlineMsg("registerMsg", "Saare fields bharo.");
+    if (password.length < 6) return inlineMsg("registerMsg", "Password kam se kam 6 characters ka hona chahiye.");
+
+    const btn = $("registerBtn");
+    setBusy(btn, true, "Account ban raha hai...");
+    inlineMsg("registerMsg", "Server se baat ho rahi hai, pehli baar 30-60 sec lag sakte hain.", "info");
+    try {
+      const data = await api("/auth/register", {
+        method: "POST",
+        body: JSON.stringify({ name, email, password }),
+      });
+      saveSession(data);
+      $("regPassword").value = "";
+      toast("Account ban gaya, welcome!");
+      showDashboard();
+    } catch (err) {
+      inlineMsg("registerMsg", err.message);
+    } finally {
+      setBusy(btn, false, "Register");
+    }
+  };
+
+  $("logoutBtn").onclick = async () => {
+    try { await api("/auth/logout", { method: "POST" }); } catch (_) {}
+    clearSession();
+    showAuth();
+    toast("Logout ho gaya");
+  };
+
+  /* ---------- accounts ---------- */
+
+  async function loadAccounts() {
+    const grid = $("accountsGrid");
+    grid.innerHTML = `<div class="skeleton"></div><div class="skeleton"></div>`;
+    try {
+      const { accounts = [] } = await api("/accounts");
+      if (!accounts.length) {
+        grid.innerHTML = `<div class="empty">Abhi koi account nahi hai. "+ New account" dabao.</div>`;
+        return;
+      }
+      grid.innerHTML = accounts.map(card).join("");
+    } catch (err) {
+      grid.innerHTML = `<div class="empty">${esc(err.message)}</div>`;
+    }
+  }
+
+  function card(a) {
+    const id = esc(a._id);
+    const ok = a.status === "ACTIVE";
+    return `
+      <div class="acc" data-id="${id}">
+        <div class="acc-top">
+          <span class="badge ${ok ? "" : "bad"}">${esc(a.status)}</span>
+          <span class="cur">${esc(a.currency)}</span>
+        </div>
+        <div class="acc-id">${id}</div>
+        <div class="bal hidden-bal" data-bal>Balance chhupa hai</div>
+        <div class="actions">
+          <button class="ghost" data-act="balance">Balance dekho</button>
+          <button class="ghost" data-act="from">Sender banao</button>
+          <button class="ghost" data-act="copy">Copy</button>
+        </div>
+      </div>`;
+  }
+
+  $("accountsGrid").addEventListener("click", async (e) => {
+    const btn = e.target.closest("button[data-act]");
+    if (!btn) return;
+    const box = btn.closest(".acc");
+    const id = box.dataset.id;
+
+    if (btn.dataset.act === "copy") {
+      try { await navigator.clipboard.writeText(id); toast("ID copy ho gaya"); }
+      catch (_) { toast("Copy nahi ho paya", "err"); }
+    }
+    if (btn.dataset.act === "from") {
+      $("fromAccount").value = id;
+      $("toAccount").focus();
+      toast("Sender set ho gaya");
+    }
+    if (btn.dataset.act === "balance") {
+      const original = btn.textContent;
+      setBusy(btn, true, "Loading");
+      try {
+        const { balance } = await api(`/accounts/balance/${id}`);
+        const el = box.querySelector("[data-bal]");
+        el.className = "bal";
+        el.textContent = money(balance);
+        btn.textContent = "Refresh";
+      } catch (err) {
+        toast(err.message, "err");
+        btn.textContent = original;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+  });
+
+  $("createAccountBtn").onclick = async () => {
+    const btn = $("createAccountBtn");
+    setBusy(btn, true, "Ban raha hai");
+    try {
+      await api("/accounts", { method: "POST" });
+      toast("Naya account ban gaya");
+      loadAccounts();
+    } catch (err) {
+      toast(err.message, "err");
+    } finally {
+      setBusy(btn, false, "+ New account");
+    }
+  };
+
+  $("refreshBtn").onclick = loadAccounts;
+
+  /* ---------- transfer ---------- */
+
+  $("transferForm").onsubmit = async (e) => {
+    e.preventDefault();
+    clearInline("transferMsg");
+    const fromAccount = $("fromAccount").value.trim();
+    const toAccount = $("toAccount").value.trim();
+    const amount = Number($("amount").value);
+
+    if (!fromAccount || !toAccount) return inlineMsg("transferMsg", "Sender aur receiver dono ID chahiye.");
+    if (!(amount > 0)) return inlineMsg("transferMsg", "Amount 0 se zyada hona chahiye.");
+    if (fromAccount === toAccount) return inlineMsg("transferMsg", "Sender aur receiver same nahi ho sakte.");
+
+    const btn = $("transferBtn");
+    setBusy(btn, true, "Transfer ho raha hai...");
+    try {
+      const data = await api("/transactions", {
+        method: "POST",
+        body: JSON.stringify({
+          fromAccount,
+          toAccount,
+          amount,
+          idempotencyKey: crypto.randomUUID(),
+        }),
+      });
+      inlineMsg("transferMsg", data.message || "Transfer ho gaya", "info");
+      $("amount").value = "";
+      loadAccounts();
+    } catch (err) {
+      inlineMsg("transferMsg", err.message);
+    } finally {
+      setBusy(btn, false, "Transfer");
+    }
+  };
+
+  /* ---------- settings ---------- */
+
+  $("apiInput").value = API;
+  $("saveApiBtn").onclick = async () => {
+    const v = $("apiInput").value.trim().replace(/\/+$/, "");
+    if (!/^https?:\/\//.test(v)) return toast("URL http:// ya https:// se shuru hona chahiye", "err");
+    API = v;
+    localStorage.setItem("apiBase", API);
+    toast("API URL save ho gaya");
+    checkServer();
+  };
+  $("resetApiBtn").onclick = () => {
+    API = DEFAULT_API;
+    localStorage.removeItem("apiBase");
+    $("apiInput").value = API;
+    toast("Default API restore ho gaya");
+    checkServer();
+  };
+
+  /* ---------- init ---------- */
+
+  checkServer();
+  if (token) showDashboard(); else showAuth();
+</script>
+</body>
+</html>
